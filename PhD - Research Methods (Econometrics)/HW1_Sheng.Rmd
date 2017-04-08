@@ -1,0 +1,117 @@
+---
+title: "Problem Set 1"
+author: "Sheng Zhang"
+date: "March 22, 2017"
+output: pdf_document
+---
+
+```{r Q1, echo=TRUE}
+
+## Q1
+
+library(foreign)
+
+# Read in data
+# taxi <- read.dta("./Spring 2017/Research Methods/02 taxi_phd.dta")
+taxi <- read.dta("./02 taxi_phd.dta")
+taxi_no_nas <- na.omit(taxi[,-2])
+
+head(taxi)
+summary(taxi)
+cor(taxi$evercmptr, taxi$logtaxis)
+cor(taxi$evercmptr, taxi$logtaxisq)
+cor(taxi_no_nas$evercmptr, taxi_no_nas$msa)
+
+cor(taxi_no_nas)
+
+library(reshape2)
+library(ggplot2)
+d <- melt(taxi_no_nas[,c(1,3,5,6,7,8,9,10,11,12,13)])
+ggplot(d,aes(x = value)) + 
+    facet_wrap(~variable,scales = "free_x") + 
+    geom_histogram()
+
+```
+
+Q1) The correlations between evercmptr and logtaxis and logtaxisq are 0.529 and 0.551 respectively, suggesting that computer adoption and firm size are postively correlated. The correlation between evercmptr logdensity is 0.207, suggesting that computer adoption and population density are postively correlated. The correlation between evercmptr and northeast, midwest, south dummy variables are -0.137, 0.013 and 0.003 respectively.
+
+
+```{r Q2, echo=TRUE}
+
+## Q2
+
+logit <- lm(evercmptr ~ .-evercmptr -taxis, data = taxi_no_nas, family = "binomial")
+summary(logit)
+
+```
+
+Q2) From the regression model, we can see that downrt, northeast, and south have significant coefficients. The coeffciencts suggest that the log odds ratio of adopting computer technology associated with a 1% increase in driver ownership is about -1.54e-03, that the log odds ratio of adopting computer technology associated with being in northeast is about -1.95e-01, and that the log odds ratio of adopting computer technology associated with being in south is about -1.04e-01.
+
+
+```{r Q3, echo=TRUE}
+
+## Q3
+
+# a)
+# Add control
+treatment <- lm(downrt ~ evercmptr + logtaxis + logtaxisq, data = taxi_no_nas)
+summary(treatment)
+
+# b)
+# Robust SE
+library(sandwich)
+library(lmtest)
+coeftest(treatment, vcov = vcovHC(treatment, "HC1"))
+# Clustered SE
+# compute Stata like df-adjustment
+G <- length(unique(taxi_no_nas$fips))
+N <- length(taxi_no_nas$fips)
+dfa <- (G/(G - 1)) * (N - 1)/treatment$df.residual
+# display with cluster VCE and df-adjustment
+country_vcov <- dfa * vcovHC(treatment, type = "HC0", cluster = "group", adjust = T)
+coeftest(treatment, vcov = country_vcov)
+
+
+# c)
+# Fixed Effects of MSA
+treatment_msa <- lm(downrt ~ factor(msa) + evercmptr + logtaxis + logtaxisq, data = taxi_no_nas)
+summary(treatment_msa)
+coeftest(treatment_msa, vcov = vcovHC(treatment_msa, "HC1"))
+
+```
+
+Q3) 
+
+a) The coefficient for evercmptr is about -8.776, which implies that when computer is adopted, the driver ownership rate decreases by about 8.776%.
+
+b) This might be beacause the within-cluster correlation is 0. In other words, geographical variation does not help explain driver ownership.
+
+c) After adding in the MSA fixed effects, the model's R^2 becomes larger, and the model's AIC becomes smaller, suggesting that adding the MSA fixed effects did improve the model. Comparing the results based on robust standard errors, we can also see that, after adding in the MSA fixed effects, the coefficients for logtaxis and logtaxisq are no longer significant at 0.05 level, while the coefficient for evercmptr, although still significant at 0.05 level, becomes less significant than before. This suggests that firm size (logtaxis and logtaxisq) might be explained by local market variation (MSA).
+
+d) From the results, we can see that the higher the computer adoption rate is, the lower the driver ownership rate is. In other words, the taxis are more likely to be owned by the contracting firm rather the drivers themselves when computers are adopted more and more. This might be because computers allow companies to better monitor how drivers drive their cars. 
+
+e) Firm size might actually determine whether the firm adopts technologies or not. So adoption might actually be endogenous.
+
+
+```{r Q4}
+
+## Q4
+
+# 2SLS
+# 1st stage: regress endogenous regressor on instruments
+first_stage <- lm(evercmptr ~ northeast + midwestdum + southdum + worktransit, data = taxi_no_nas)
+summary(first_stage)
+# 2nd stage: regress dependent variable on fitted values from 1st stage along with other independent variables
+second_stage <- lm(downrt ~ first_stage$fitted.values + logtaxis + logtaxisq, data = taxi_no_nas)
+summary(second_stage)
+
+```
+
+Q4)
+
+a) The F-statistics for the first stage model is 11.92, with a p-value of 2.595e-09, suggesting that the model is significantly different from a null model. The coefficient for northeast is about -0.245, with a p-value of 7.15e-07, indicating that northeast has a higher computer adoption rate. The coefficient for worktransit is about 0.014, with a p-value of 1.28e-08. The R^2 suggests that 7.71% of the variance of evercmptr is explained by the model.
+
+b) The second stage least square has a F of 14.41 and a R^2 of 0.07026, which are both larger than their comparables in the OLS model, suggesting that the 2SLS performs better than the OLS. However, the coefficient for evercmptr_hat is 45.44, while it is -8.776 in the OLS model, indicating that the instruments we selected actually are important in our model. In other words, regions and worktransit is correlated with driver ownership only because it is correlated with computer adoption, so after we factor these instruments out, an increase in computer adoption actually leads to a increase in predicted driver ownership.
+
+c) From the results, we can see that the higher the computer adoption rate is, the lower the driver ownership rate is, if we don't account for endogeneity. But if we do account for endogeneity, the effect reverses. In other words, the taxis are more likely to be owned by the contracting firm rather the drivers themselves when computers are less adopted, after we take endogeneity into account. An ideal experiment would be randomly assigning taxis to treatment and control conditions that differ in the level of computer adoption and observe how driver ownership change over time. It could be difficult to randomly assign computer technology to taxis, so the best we could do is perhaps use difference-in-difference to factor out taxi-specific and time-specific effects.
+
