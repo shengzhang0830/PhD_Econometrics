@@ -1,0 +1,19 @@
+generate residual = wage - (18.25768) - 0.0889534*exper
+reg residual exper
+twoway scatter residual exper
+
+generate residual2 = wage - (17.84125) - 0.0497149*exper if female==1
+reg residual2 exper if female==1
+twoway scatter residual2 exper if female==1
+
+generate residual3 = wage - (18.45112) - 0.1407156*exper if female==0
+reg residual3 exper if female==0
+twoway scatter residual3 exper if female==0
+
+generate residual4 = wage - (15.78931) - 0.073835*exper if black==1
+reg residual4 exper if black==1
+twoway scatter residual4 exper if black==1
+
+generate residual5 = wage - (18.65555) - 0.145527*exper if black==0&asian==0&female==0
+reg residual5 exper if black==0&asian==0&female==0
+twoway scatter residual5 exper if black==0&asian==0&female==0
